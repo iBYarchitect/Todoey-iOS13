@@ -9,7 +9,7 @@
 import UIKit
 import RealmSwift
 
-class TodoListViewController: UITableViewController {
+class TodoListViewController: SwipeTableViewController {
     
     var todoItems : Results<Item>?
     let realm = try! Realm()
@@ -22,6 +22,7 @@ class TodoListViewController: UITableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        tableView.rowHeight = 80.0
         print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
         
     }
@@ -34,7 +35,7 @@ class TodoListViewController: UITableViewController {
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
-        let cell = tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         
         if let item = todoItems?[indexPath.row] {
             cell.textLabel?.text = item.title
@@ -47,6 +48,7 @@ class TodoListViewController: UITableViewController {
         
     }
     
+    
     //MARK: - Tableview Delegate Methods
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -55,7 +57,7 @@ class TodoListViewController: UITableViewController {
             do {
                 try realm.write {
                     item.done = !item.done
-            }
+                }
             } catch {
                 print("Error saving done status, \(error)")
             }
@@ -82,6 +84,7 @@ class TodoListViewController: UITableViewController {
                 do {
                     try self.realm.write {
                         let newItem = Item()
+                        newItem.dateCreated = Date()
                         newItem.title = textField.text!
                         currentCategory.items.append(newItem)
                     }
@@ -95,7 +98,6 @@ class TodoListViewController: UITableViewController {
             
         }
         
-        
         alert.addTextField { (alertTextField) in
             alertTextField.placeholder = "Create new item"
             textField = alertTextField
@@ -107,9 +109,21 @@ class TodoListViewController: UITableViewController {
         
     }
     
-    // MARK: - Model Manipulation Methods
+    //MARK: - Delete data from DB
     
-    
+    override func updateModel(at indexPath: IndexPath) {
+        
+        if let itemDelete = self.todoItems?[indexPath.row] {
+            do {
+                try realm.write {
+                    realm.delete(itemDelete)
+                }
+            } catch {
+                print("Error deleting, \(error)")
+            }
+        }
+        
+    }
     
     // MARK: - Loading Data Methods
     
@@ -117,33 +131,29 @@ class TodoListViewController: UITableViewController {
         
         todoItems = selectedCategory?.items.sorted(byKeyPath: "title", ascending: true)
         
-        
     }
     
 }
 
 // MARK: - Search bar methods
 
-//extension TodoListViewController: UISearchBarDelegate {
-//
-//    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-//        let request : NSFetchRequest<Item> = Item.fetchRequest()
-//
-//        let predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
-//
-//        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
-//
-//        loadItems(with: request, predicate: predicate)
-//
-//    }
-//
-//    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
-//        if searchBar.text?.count == 0 {
-//            loadItems()
-//            DispatchQueue.main.async {
-//                searchBar.resignFirstResponder()
-//            }
-//        }
-//    }
-//}
+extension TodoListViewController: UISearchBarDelegate {
+    
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        
+        todoItems = todoItems?.filter("title CONTAINS[cd] %@", searchBar.text!).sorted(byKeyPath: "dateCreated", ascending: true)
+        
+        tableView.reloadData()
+        
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0 {
+            loadItems()
+            DispatchQueue.main.async {
+                searchBar.resignFirstResponder()
+            }
+        }
+    }
+}
 
